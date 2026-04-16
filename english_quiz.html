@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WORD MASTER / 英単語クイズ</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box;}
+    :root{
+      --bg:#08081a; --card:#0d0d28;
+      --cyan:#00f5ff; --purple:#bf5fff; --green:#00ff88;
+      --red:#ff2255; --gold:#ffd700; --pink:#ff66cc;
+      --orange:#ff8c00; --blue:#4488ff;
+      --txt:#e0e8ff; --sub:#8899bb;
+    }
+    body{
+      font-family:'Segoe UI','Hiragino Sans','Meiryo','Yu Gothic',sans-serif;
+      background:var(--bg); color:var(--txt);
+      min-height:100vh; display:flex; align-items:center; justify-content:center;
+      overflow-x:hidden;
+    }
+    body::before{
+      content:''; position:fixed; inset:0; pointer-events:none; z-index:0;
+      background-image:
+        linear-gradient(rgba(0,245,255,.012) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(0,245,255,.012) 1px,transparent 1px);
+      background-size:50px 50px;
+    }
+    /* 星 */
+    .stars{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+    .star{position:absolute;border-radius:50%;background:#fff;animation:twinkle linear infinite;}
+    @keyframes twinkle{0%,100%{opacity:.1;transform:scale(1)}50%{opacity:.9;transform:scale(1.4)}}
+    /* パーティクル */
+    .pcont{position:fixed;inset:0;pointer-events:none;z-index:50;}
+    .particle{position:absolute;border-radius:50%;animation:pfly linear forwards;}
+    @keyframes pfly{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:var(--tx) scale(0)}}
+    /* コンボ */
+    .combo-overlay{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;z-index:100;text-align:center;}
+    .combo-text{font-size:clamp(2rem,10vw,4rem);font-weight:900;color:var(--gold);text-shadow:0 0 20px var(--gold);animation:cAnim .7s ease forwards;letter-spacing:3px;}
+    @keyframes cAnim{0%{opacity:0;transform:scale(.3) rotate(-10deg)}35%{opacity:1;transform:scale(1.2) rotate(3deg)}70%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(.8) translateY(-30px)}}
+    /* レベルアップ */
+    .lvup{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;z-index:200;pointer-events:none;display:none;}
+    .lvup-txt{font-size:clamp(2rem,10vw,3.5rem);font-weight:900;color:var(--purple);text-shadow:0 0 30px var(--purple);letter-spacing:4px;animation:lvAnim 1s ease forwards;}
+    @keyframes lvAnim{0%{opacity:0;transform:scale(.4)}30%{opacity:1;transform:scale(1.3)}70%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1) translateY(-50px)}}
+
+    /* ===== コンテナ ===== */
+    #app{position:relative;z-index:1;width:100%;max-width:640px;padding:14px;}
+    .screen{display:none;}
+    .screen.active{display:block;animation:sIn .3s ease;}
+    @keyframes sIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+    .card{background:var(--card);border:1px solid rgba(0,245,255,.18);border-radius:20px;padding:26px 24px;
+      box-shadow:0 0 30px rgba(0,245,255,.06),inset 0 1px 0 rgba(255,255,255,.04);}
+
+    /* ===== 共通 ===== */
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+      border-radius:50px;border:2px solid;font-weight:bold;letter-spacing:1.5px;
+      cursor:pointer;transition:all .13s ease;position:relative;overflow:hidden;
+      text-transform:uppercase;background:transparent;font-family:inherit;
+      white-space:nowrap;}
+    .btn::before{content:'';position:absolute;inset:0;background:currentColor;opacity:0;transition:opacity .13s;}
+    .btn:hover::before{opacity:.1}
+    .btn:active{transform:scale(.96)}
+
+    /* ===== タイトル画面 ===== */
+    #titleScreen{text-align:center;}
+    .logo{font-size:clamp(2rem,8vw,3.5rem);font-weight:900;letter-spacing:4px;
+      background:linear-gradient(135deg,var(--cyan),var(--purple),var(--pink));
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+      animation:logoGlow 2s ease-in-out infinite;margin-bottom:4px;}
+    @keyframes logoGlow{0%,100%{filter:brightness(1)}50%{filter:brightness(1.35)}}
+    .logo-sub{font-size:.9rem;color:var(--sub);letter-spacing:6px;margin-bottom:22px;}
+
+    /* ストリークバナー */
+    .streak-banner{background:linear-gradient(90deg,rgba(255,215,0,.1),rgba(255,102,204,.1));
+      border:1px solid rgba(255,215,0,.35);border-radius:12px;padding:9px 14px;
+      margin-bottom:14px;font-size:.82rem;color:var(--gold);text-align:center;display:none;}
+
+    /* タイトルステータスグリッド */
+    .title-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;}
+    .ts-box{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);
+      border-radius:12px;padding:12px 14px;text-align:center;}
+    .ts-label{font-size:.6rem;color:var(--sub);letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;}
+    .ts-val{font-size:1.4rem;font-weight:bold;}
+    .ts-hs .ts-val{color:var(--gold);}
+    .ts-lv .ts-val{color:var(--purple);}
+    .ts-games .ts-val{color:var(--cyan);}
+    .ts-streak .ts-val{color:var(--orange);}
+
+    /* タイトルボタン群 */
+    .title-btns{display:flex;flex-direction:column;gap:11px;align-items:center;}
+    .btn-play{color:var(--cyan);border-color:var(--cyan);font-size:1.3rem;padding:16px 60px;
+      animation:pbAnim 1.5s ease-in-out infinite;}
+    @keyframes pbAnim{0%,100%{box-shadow:0 0 16px rgba(0,245,255,.4)}50%{box-shadow:0 0 36px rgba(0,245,255,.9)}}
+    .btn-rank{color:var(--gold);border-color:var(--gold);font-size:.95rem;padding:11px 32px;}
+    .btn-stats{color:var(--purple);border-color:var(--purple);font-size:.95rem;padding:11px 32px;}
+    .btn-settings{color:var(--sub);border-color:var(--sub);font-size:.85rem;padding:9px 24px;}
+    .title-sub-row{display:flex;gap:10px;}
+
+    /* ===== ランキング画面 ===== */
+    #rankingScreen .screen-title{font-size:1.3rem;font-weight:bold;color:var(--gold);
+      letter-spacing:3px;text-align:center;margin-bottom:18px;}
+    .rank-table{width:100%;}
+    .rank-row{display:grid;grid-template-columns:36px 1fr 90px 70px;gap:6px;align-items:center;
+      padding:10px 10px;border-radius:10px;margin-bottom:6px;
+      background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);
+      font-size:.88rem;}
+    .rank-row.gold-row{background:rgba(255,215,0,.08);border-color:rgba(255,215,0,.3);}
+    .rank-row.silver-row{background:rgba(192,192,192,.06);border-color:rgba(192,192,192,.25);}
+    .rank-row.bronze-row{background:rgba(205,127,50,.06);border-color:rgba(205,127,50,.25);}
+    .rank-pos{font-weight:900;font-size:1rem;text-align:center;}
+    .rank-score{font-weight:bold;color:var(--cyan);font-size:1.05rem;}
+    .rank-detail{color:var(--sub);font-size:.75rem;}
+    .rank-date{color:var(--sub);font-size:.72rem;text-align:right;}
+    .rank-empty{text-align:center;color:var(--sub);padding:30px;font-size:.9rem;}
+    .back-btn-wrap{text-align:center;margin-top:18px;}
+    .btn-back{color:var(--sub);border-color:var(--sub);font-size:.9rem;padding:10px 28px;}
+
+    /* ===== 統計画面 ===== */
+    #statsScreen .screen-title{font-size:1.3rem;font-weight:bold;color:var(--purple);
+      letter-spacing:3px;text-align:center;margin-bottom:18px;}
+    .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+    .stat-cell{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);
+      border-radius:12px;padding:14px;text-align:center;}
+    .stat-cell-label{font-size:.62rem;color:var(--sub);letter-spacing:2px;text-transform:uppercase;margin-bottom:5px;}
+    .stat-cell-val{font-size:1.6rem;font-weight:bold;color:var(--cyan);}
+    .stat-cell-val.purple{color:var(--purple);}
+    .stat-cell-val.green{color:var(--green);}
+    .stat-cell-val.gold{color:var(--gold);}
+    .stat-cell-val.pink{color:var(--pink);}
+    .accuracy-bar-wrap{margin-top:12px;}
+    .accuracy-label{font-size:.7rem;color:var(--sub);margin-bottom:5px;display:flex;justify-content:space-between;}
+    .accuracy-bg{height:10px;background:rgba(255,255,255,.06);border-radius:5px;overflow:hidden;}
+    .accuracy-fill{height:100%;background:linear-gradient(90deg,var(--green),var(--cyan));border-radius:5px;transition:width .6s ease;}
+
+    /* ===== 設定画面 ===== */
+    #settingsScreen .screen-title{font-size:1.3rem;font-weight:bold;color:var(--blue);
+      letter-spacing:3px;text-align:center;margin-bottom:18px;}
+    .setting-row{display:flex;justify-content:space-between;align-items:center;
+      background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);
+      border-radius:12px;padding:14px 16px;margin-bottom:10px;}
+    .setting-label{font-size:.9rem;}
+    .setting-label span{display:block;font-size:.7rem;color:var(--sub);margin-top:2px;}
+    .seg-ctrl{display:flex;gap:4px;}
+    .seg-btn{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.15);
+      border-radius:8px;color:var(--sub);font-size:.8rem;padding:6px 14px;
+      cursor:pointer;transition:all .12s;font-family:inherit;}
+    .seg-btn.active{background:rgba(0,245,255,.12);border-color:var(--cyan);color:var(--cyan);}
+    .danger-zone{margin-top:14px;text-align:center;}
+    .btn-reset{color:var(--red);border-color:var(--red);font-size:.82rem;padding:8px 20px;}
+
+    /* ===== ゲーム画面 ===== */
+    .xp-wrap{margin-bottom:10px;}
+    .xp-head{display:flex;justify-content:space-between;font-size:.68rem;color:var(--sub);margin-bottom:3px;}
+    .xp-bg{height:7px;background:rgba(255,255,255,.05);border-radius:4px;overflow:hidden;}
+    .xp-fill{height:100%;background:linear-gradient(90deg,var(--purple),var(--pink));border-radius:4px;transition:width .4s ease;}
+
+    .status-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:5px;}
+    .sbox{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);
+      border-radius:9px;padding:5px 8px;text-align:center;flex:1;}
+    .slabel{font-size:.58rem;color:var(--sub);letter-spacing:1.5px;text-transform:uppercase;}
+    .sval{font-size:1.1rem;font-weight:bold;line-height:1.2;}
+    .s-score .sval{color:var(--cyan);}
+    .s-lives .sval{color:var(--red);}
+    .s-combo .sval{color:var(--gold);}
+    .s-qnum  .sval{color:var(--purple);}
+    .s-diff  .sval{color:var(--green);font-size:.85rem;}
+
+    .timer-wrap{height:7px;background:rgba(255,255,255,.05);border-radius:4px;margin-bottom:12px;overflow:hidden;}
+    .timer-bar{height:100%;border-radius:4px;transition:width .08s linear,background .4s;background:var(--cyan);}
+    .timer-bar.danger{background:var(--red);animation:dPulse .25s ease-in-out infinite;}
+    @keyframes dPulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+    .word-card{background:linear-gradient(135deg,rgba(0,245,255,.03),rgba(191,95,255,.03));
+      border:1px solid rgba(0,245,255,.18);border-radius:14px;padding:20px 16px;
+      text-align:center;margin-bottom:12px;position:relative;overflow:hidden;}
+    .word-card.rare{border-color:var(--gold);animation:rGlow .5s ease-in-out infinite alternate;}
+    @keyframes rGlow{from{box-shadow:0 0 14px rgba(255,215,0,.3)}to{box-shadow:0 0 32px rgba(255,215,0,.7)}}
+    .rare-badge{position:absolute;top:8px;right:12px;background:var(--gold);color:#000;
+      font-size:.58rem;font-weight:bold;padding:2px 8px;border-radius:20px;letter-spacing:1px;}
+    .diff-badge{position:absolute;top:8px;left:12px;border-radius:20px;
+      font-size:.58rem;font-weight:bold;padding:2px 8px;letter-spacing:1px;}
+    .diff-1{background:rgba(0,245,255,.2);color:var(--cyan);}
+    .diff-2{background:rgba(0,255,136,.2);color:var(--green);}
+    .diff-3{background:rgba(255,102,204,.2);color:var(--pink);}
+    .diff-4{background:rgba(255,215,0,.2);color:var(--gold);}
+    .word-en{font-size:clamp(2rem,9vw,3rem);font-weight:900;letter-spacing:4px;color:#fff;
+      text-shadow:0 0 16px rgba(0,245,255,.4);}
+    .word-cat{font-size:.68rem;color:var(--sub);letter-spacing:3px;margin-top:3px;text-transform:uppercase;}
+
+    .feedback{text-align:center;height:36px;line-height:36px;font-size:.95rem;font-weight:bold;
+      letter-spacing:1.5px;border-radius:9px;margin-bottom:10px;}
+    .fb-ok{color:var(--green);background:rgba(0,255,136,.07);animation:fbIn .2s ease;}
+    .fb-ng{color:var(--red);background:rgba(255,34,85,.07);animation:fbIn .2s ease;}
+    @keyframes fbIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+    .choices{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+    .cbtn{background:rgba(255,255,255,.03);border:1.5px solid rgba(255,255,255,.12);
+      border-radius:12px;color:var(--txt);font-size:clamp(.88rem,3.5vw,1rem);
+      padding:13px 8px;cursor:pointer;transition:all .11s ease;font-family:inherit;}
+    .cbtn:hover:not(:disabled){border-color:var(--cyan);color:var(--cyan);
+      box-shadow:0 0 10px rgba(0,245,255,.25);transform:translateY(-2px);}
+    .cbtn:active:not(:disabled){transform:scale(.97)}
+    .cbtn.correct{background:rgba(0,255,136,.12);border-color:var(--green);color:var(--green);
+      box-shadow:0 0 16px rgba(0,255,136,.4);animation:cFlash .3s ease;}
+    .cbtn.wrong{background:rgba(255,34,85,.12);border-color:var(--red);color:var(--red);
+      box-shadow:0 0 16px rgba(255,34,85,.4);animation:wShake .3s ease;}
+    @keyframes cFlash{0%{transform:scale(1)}30%{transform:scale(1.04)}100%{transform:scale(1)}}
+    @keyframes wShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+
+    /* ===== 結果画面 ===== */
+    #resultScreen{text-align:center;}
+    .res-title{font-size:1.2rem;color:var(--sub);letter-spacing:4px;text-transform:uppercase;margin-bottom:12px;}
+    .rank-big{font-size:clamp(4.5rem,18vw,8rem);font-weight:900;line-height:1;margin-bottom:4px;
+      animation:rAppear .5s cubic-bezier(.34,1.56,.64,1) forwards;}
+    @keyframes rAppear{from{opacity:0;transform:scale(0)}to{opacity:1;transform:scale(1)}}
+    .rank-S{color:var(--gold);text-shadow:0 0 40px var(--gold);}
+    .rank-A{color:var(--cyan);text-shadow:0 0 40px var(--cyan);}
+    .rank-B{color:var(--green);text-shadow:0 0 40px var(--green);}
+    .rank-C{color:var(--sub);}
+    .rank-lbl{font-size:.9rem;color:var(--sub);margin-bottom:18px;letter-spacing:2px;}
+    .new-hs{color:var(--gold);font-size:.9rem;font-weight:bold;letter-spacing:3px;
+      margin-bottom:14px;animation:blinkG .55s ease-in-out infinite;}
+    @keyframes blinkG{0%,100%{opacity:1}50%{opacity:.2}}
+    .res-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:20px;}
+    .rstat{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.08);
+      border-radius:10px;padding:10px;}
+    .rstat-lbl{font-size:.6rem;color:var(--sub);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px;}
+    .rstat-val{font-size:1.5rem;font-weight:bold;color:var(--cyan);}
+    .res-btns{display:flex;flex-direction:column;gap:10px;align-items:center;}
+    .btn-retry{color:var(--pink);border-color:var(--pink);font-size:1.3rem;padding:16px 52px;
+      animation:pPink 1s ease-in-out infinite;}
+    @keyframes pPink{0%,100%{box-shadow:0 0 16px rgba(255,102,204,.5)}50%{box-shadow:0 0 36px rgba(255,102,204,1)}}
+    .btn-title-sm{color:var(--sub);border-color:var(--sub);font-size:.85rem;padding:9px 24px;}
+
+    /* ===== レスポンシブ ===== */
+    @media(max-width:480px){
+      .card{padding:18px 13px;}
+      .choices{gap:7px;}
+      .cbtn{padding:11px 6px;font-size:.86rem;}
+      .btn-play{font-size:1.1rem;padding:14px 40px;}
+      .title-sub-row{flex-direction:column;}
+      .res-stats{grid-template-columns:1fr 1fr;}
+    }
+  </style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+<div class="pcont" id="pcont"></div>
+<div class="combo-overlay" id="comboOverlay"></div>
+<div class="lvup" id="lvupEl"><div class="lvup-txt">LEVEL UP!</div></div>
+
+<div id="app">
+
+  <!-- ===== タイトル ===== -->
+  <div id="titleScreen" class="screen card">
+    <div class="logo">WORD MASTER</div>
+    <div class="logo-sub">英単語クイズ</div>
+    <div class="streak-banner" id="streakBanner"></div>
+
+    <div class="title-stats">
+      <div class="ts-box ts-hs">
+        <div class="ts-label">🏆 BEST SCORE</div>
+        <div class="ts-val" id="t-hs">0</div>
+      </div>
+      <div class="ts-box ts-lv">
+        <div class="ts-label">📊 LEVEL</div>
+        <div class="ts-val" id="t-lv">1</div>
+      </div>
+      <div class="ts-box ts-games">
+        <div class="ts-label">🎮 GAMES</div>
+        <div class="ts-val" id="t-games">0</div>
+      </div>
+      <div class="ts-box ts-streak">
+        <div class="ts-label">🔥 STREAK</div>
+        <div class="ts-val" id="t-streak">0日</div>
+      </div>
+    </div>
+
+    <div class="title-btns">
+      <button class="btn btn-play" onclick="startGame()">▶ PLAY</button>
+      <div class="title-sub-row">
+        <button class="btn btn-rank" onclick="showScreen('rankingScreen')">🏅 ランキング</button>
+        <button class="btn btn-stats" onclick="showScreen('statsScreen')">📈 統計</button>
+      </div>
+      <button class="btn btn-settings" onclick="showScreen('settingsScreen')">⚙️ 設定</button>
+    </div>
+  </div>
+
+  <!-- ===== ランキング画面 ===== -->
+  <div id="rankingScreen" class="screen card">
+    <div class="screen-title">🏅 MY RANKING</div>
+    <div class="rank-table" id="rankTable"></div>
+    <div class="back-btn-wrap">
+      <button class="btn btn-back" onclick="showTitle()">← 戻る</button>
+    </div>
+  </div>
+
+  <!-- ===== 統計画面 ===== -->
+  <div id="statsScreen" class="screen card">
+    <div class="screen-title">📈 STATISTICS</div>
+    <div class="stats-grid">
+      <div class="stat-cell"><div class="stat-cell-label">総プレイ回数</div><div class="stat-cell-val" id="st-games">0</div></div>
+      <div class="stat-cell"><div class="stat-cell-label">総正解数</div><div class="stat-cell-val green" id="st-correct">0</div></div>
+      <div class="stat-cell"><div class="stat-cell-label">総獲得スコア</div><div class="stat-cell-val gold" id="st-score">0</div></div>
+      <div class="stat-cell"><div class="stat-cell-label">最高コンボ</div><div class="stat-cell-val pink" id="st-combo">0</div></div>
+      <div class="stat-cell"><div class="stat-cell-label">総XP</div><div class="stat-cell-val purple" id="st-xp">0</div></div>
+      <div class="stat-cell"><div class="stat-cell-label">レベル</div><div class="stat-cell-val purple" id="st-lv">1</div></div>
+    </div>
+    <div class="accuracy-bar-wrap">
+      <div class="accuracy-label"><span>正解率</span><span id="st-acc">0%</span></div>
+      <div class="accuracy-bg"><div class="accuracy-fill" id="st-accBar" style="width:0%"></div></div>
+    </div>
+    <div class="back-btn-wrap" style="margin-top:18px">
+      <button class="btn btn-back" onclick="showTitle()">← 戻る</button>
+    </div>
+  </div>
+
+  <!-- ===== 設定画面 ===== -->
+  <div id="settingsScreen" class="screen card">
+    <div class="screen-title">⚙️ SETTINGS</div>
+    <div class="setting-row">
+      <div class="setting-label">制限時間<span>1問あたりの秒数</span></div>
+      <div class="seg-ctrl" id="timerSeg">
+        <button class="seg-btn" data-val="8"  onclick="setSetting('timer',8)">8秒</button>
+        <button class="seg-btn" data-val="10" onclick="setSetting('timer',10)">10秒</button>
+        <button class="seg-btn" data-val="15" onclick="setSetting('timer',15)">15秒</button>
+      </div>
+    </div>
+    <div class="setting-row">
+      <div class="setting-label">選択肢の数<span>難易度に影響します</span></div>
+      <div class="seg-ctrl" id="choiceSeg">
+        <button class="seg-btn" data-val="3" onclick="setSetting('choice',3)">3択</button>
+        <button class="seg-btn" data-val="4" onclick="setSetting('choice',4)">4択</button>
+      </div>
+    </div>
+    <div class="setting-row">
+      <div class="setting-label">ライフ数<span>0でゲームオーバー</span></div>
+      <div class="seg-ctrl" id="livesSeg">
+        <button class="seg-btn" data-val="1" onclick="setSetting('lives',1)">1</button>
+        <button class="seg-btn" data-val="3" onclick="setSetting('lives',3)">3</button>
+        <button class="seg-btn" data-val="5" onclick="setSetting('lives',5)">5</button>
+      </div>
+    </div>
+    <div class="danger-zone">
+      <button class="btn btn-reset" onclick="resetData()">🗑 データをリセット</button>
+    </div>
+    <div class="back-btn-wrap" style="margin-top:14px">
+      <button class="btn btn-back" onclick="showTitle()">← 戻る</button>
+    </div>
+  </div>
+
+  <!-- ===== ゲーム画面 ===== -->
+  <div id="gameScreen" class="screen">
+    <div class="card">
+      <div class="xp-wrap">
+        <div class="xp-head">
+          <span>LV.<span id="g-lv">1</span></span>
+          <span><span id="g-xp">0</span>/<span id="g-nxp">100</span> XP</span>
+        </div>
+        <div class="xp-bg"><div class="xp-fill" id="xpFill" style="width:0%"></div></div>
+      </div>
+      <div class="status-bar">
+        <div class="sbox s-score"><div class="slabel">SCORE</div><div class="sval" id="g-score">0</div></div>
+        <div class="sbox s-lives"><div class="slabel">LIVES</div><div class="sval" id="g-lives">❤❤❤</div></div>
+        <div class="sbox s-combo"><div class="slabel">COMBO</div><div class="sval" id="g-combo">×1.0</div></div>
+        <div class="sbox s-qnum"><div class="slabel">問題</div><div class="sval" id="g-qnum">1</div></div>
+        <div class="sbox s-diff"><div class="slabel">STAGE</div><div class="sval" id="g-diff">Lv.1</div></div>
+      </div>
+      <div class="timer-wrap"><div class="timer-bar" id="timerBar" style="width:100%"></div></div>
+      <div class="word-card" id="wordCard">
+        <div class="diff-badge" id="diffBadge"></div>
+        <div class="rare-badge" id="rareBadge" style="display:none">★ RARE</div>
+        <div class="word-en" id="wordEn">apple</div>
+        <div class="word-cat" id="wordCat">noun</div>
+      </div>
+      <div class="feedback" id="feedback"></div>
+      <div class="choices" id="choices"></div>
+    </div>
+  </div>
+
+  <!-- ===== 結果画面 ===== -->
+  <div id="resultScreen" class="screen card">
+    <div class="res-title">GAME OVER</div>
+    <div class="rank-big" id="res-rank">B</div>
+    <div class="rank-lbl" id="res-lbl">Good!</div>
+    <div class="new-hs" id="res-newhs" style="display:none">🎉 NEW HIGH SCORE!</div>
+    <div class="res-stats">
+      <div class="rstat"><div class="rstat-lbl">スコア</div><div class="rstat-val" id="res-score">0</div></div>
+      <div class="rstat"><div class="rstat-lbl">正解数</div><div class="rstat-val" id="res-correct">0</div></div>
+      <div class="rstat"><div class="rstat-lbl">最大コンボ</div><div class="rstat-val" id="res-combo">0</div></div>
+    </div>
+    <div class="res-btns">
+      <button class="btn btn-retry" onclick="startGame()">🔁 もう一回！</button>
+      <button class="btn btn-title-sm" onclick="showTitle()">タイトルへ</button>
+    </div>
+  </div>
+
+</div><!-- /#app -->
+
+<script>
+/* ============================================================
+   WORD MASTER — 英単語クイズ 完全版
+   単語200語・スコアランキング・統計・設定対応
+============================================================ */
+
+// ===== 単語データベース（約200語）=====
+const WORDS = [
+  // ─────── Lv1：超基本 ───────
+  {en:'apple',      ja:'りんご',       cat:'noun',      rare:false, level:1},
+  {en:'book',       ja:'本',           cat:'noun',      rare:false, level:1},
+  {en:'cat',        ja:'ねこ',         cat:'noun',      rare:false, level:1},
+  {en:'dog',        ja:'いぬ',         cat:'noun',      rare:false, level:1},
+  {en:'bird',       ja:'鳥',           cat:'noun',      rare:false, level:1},
+  {en:'fish',       ja:'魚',           cat:'noun',      rare:false, level:1},
+  {en:'egg',        ja:'たまご',       cat:'noun',      rare:false, level:1},
+  {en:'milk',       ja:'牛乳',         cat:'noun',      rare:false, level:1},
+  {en:'bread',      ja:'パン',         cat:'noun',      rare:false, level:1},
+  {en:'rice',       ja:'ごはん・米',   cat:'noun',      rare:false, level:1},
+  {en:'run',        ja:'走る',         cat:'verb',      rare:false, level:1},
+  {en:'eat',        ja:'食べる',       cat:'verb',      rare:false, level:1},
+  {en:'drink',      ja:'飲む',         cat:'verb',      rare:false, level:1},
+  {en:'sleep',      ja:'眠る',         cat:'verb',      rare:false, level:1},
+  {en:'walk',       ja:'歩く',         cat:'verb',      rare:false, level:1},
+  {en:'talk',       ja:'話す',         cat:'verb',      rare:false, level:1},
+  {en:'read',       ja:'読む',         cat:'verb',      rare:false, level:1},
+  {en:'write',      ja:'書く',         cat:'verb',      rare:false, level:1},
+  {en:'play',       ja:'遊ぶ',         cat:'verb',      rare:false, level:1},
+  {en:'jump',       ja:'ジャンプする', cat:'verb',      rare:false, level:1},
+  {en:'sun',        ja:'太陽',         cat:'noun',      rare:false, level:1},
+  {en:'moon',       ja:'月',           cat:'noun',      rare:false, level:1},
+  {en:'star',       ja:'星',           cat:'noun',      rare:false, level:1},
+  {en:'sky',        ja:'空',           cat:'noun',      rare:false, level:1},
+  {en:'sea',        ja:'海',           cat:'noun',      rare:false, level:1},
+  {en:'rain',       ja:'雨',           cat:'noun',      rare:false, level:1},
+  {en:'snow',       ja:'雪',           cat:'noun',      rare:false, level:1},
+  {en:'wind',       ja:'風',           cat:'noun',      rare:false, level:1},
+  {en:'fire',       ja:'火',           cat:'noun',      rare:false, level:1},
+  {en:'water',      ja:'水',           cat:'noun',      rare:false, level:1},
+  {en:'mountain',   ja:'山',           cat:'noun',      rare:false, level:1},
+  {en:'river',      ja:'川',           cat:'noun',      rare:false, level:1},
+  {en:'flower',     ja:'花',           cat:'noun',      rare:false, level:1},
+  {en:'tree',       ja:'木',           cat:'noun',      rare:false, level:1},
+  {en:'house',      ja:'家',           cat:'noun',      rare:false, level:1},
+  {en:'door',       ja:'ドア',         cat:'noun',      rare:false, level:1},
+  {en:'window',     ja:'窓',           cat:'noun',      rare:false, level:1},
+  {en:'chair',      ja:'いす',         cat:'noun',      rare:false, level:1},
+  {en:'table',      ja:'テーブル',     cat:'noun',      rare:false, level:1},
+  {en:'road',       ja:'道',           cat:'noun',      rare:false, level:1},
+  {en:'car',        ja:'車',           cat:'noun',      rare:false, level:1},
+  {en:'big',        ja:'大きい',       cat:'adjective', rare:false, level:1},
+  {en:'small',      ja:'小さい',       cat:'adjective', rare:false, level:1},
+  {en:'long',       ja:'長い',         cat:'adjective', rare:false, level:1},
+  {en:'short',      ja:'短い',         cat:'adjective', rare:false, level:1},
+  {en:'hot',        ja:'暑い・熱い',   cat:'adjective', rare:false, level:1},
+  {en:'cold',       ja:'冷たい・寒い', cat:'adjective', rare:false, level:1},
+  {en:'good',       ja:'良い',         cat:'adjective', rare:false, level:1},
+  {en:'bad',        ja:'悪い',         cat:'adjective', rare:false, level:1},
+  {en:'fast',       ja:'速い',         cat:'adjective', rare:false, level:1},
+  {en:'slow',       ja:'遅い',         cat:'adjective', rare:false, level:1},
+  {en:'new',        ja:'新しい',       cat:'adjective', rare:false, level:1},
+  {en:'old',        ja:'古い',         cat:'adjective', rare:false, level:1},
+  {en:'happy',      ja:'幸せな',       cat:'adjective', rare:false, level:1},
+  {en:'sad',        ja:'悲しい',       cat:'adjective', rare:false, level:1},
+  {en:'love',       ja:'愛',           cat:'noun',      rare:false, level:1},
+  {en:'friend',     ja:'友だち',       cat:'noun',      rare:false, level:1},
+  {en:'smile',      ja:'笑顔',         cat:'noun',      rare:false, level:1},
+  {en:'dream',      ja:'夢',           cat:'noun',      rare:false, level:1},
+  {en:'voice',      ja:'声',           cat:'noun',      rare:false, level:1},
+  {en:'heart',      ja:'心・ハート',   cat:'noun',      rare:false, level:1},
+  {en:'hand',       ja:'手',           cat:'noun',      rare:false, level:1},
+  {en:'eye',        ja:'目',           cat:'noun',      rare:false, level:1},
+  {en:'head',       ja:'頭',           cat:'noun',      rare:false, level:1},
+  {en:'foot',       ja:'足',           cat:'noun',      rare:false, level:1},
+  // ─────── Lv2：中級 ───────
+  {en:'beautiful',  ja:'美しい',       cat:'adjective', rare:false, level:2},
+  {en:'difficult',  ja:'難しい',       cat:'adjective', rare:false, level:2},
+  {en:'important',  ja:'重要な',       cat:'adjective', rare:false, level:2},
+  {en:'wonderful',  ja:'素晴らしい',   cat:'adjective', rare:false, level:2},
+  {en:'dangerous',  ja:'危険な',       cat:'adjective', rare:false, level:2},
+  {en:'exciting',   ja:'わくわくする', cat:'adjective', rare:false, level:2},
+  {en:'delicious',  ja:'おいしい',     cat:'adjective', rare:false, level:2},
+  {en:'peaceful',   ja:'平和な',       cat:'adjective', rare:false, level:2},
+  {en:'powerful',   ja:'力強い',       cat:'adjective', rare:false, level:2},
+  {en:'honest',     ja:'正直な',       cat:'adjective', rare:false, level:2},
+  {en:'careful',    ja:'注意深い',     cat:'adjective', rare:false, level:2},
+  {en:'nervous',    ja:'緊張した',     cat:'adjective', rare:false, level:2},
+  {en:'surprised',  ja:'驚いた',       cat:'adjective', rare:false, level:2},
+  {en:'gentle',     ja:'優しい',       cat:'adjective', rare:false, level:2},
+  {en:'brilliant',  ja:'輝かしい',     cat:'adjective', rare:false, level:2},
+  {en:'ancient',    ja:'古代の',       cat:'adjective', rare:false, level:2},
+  {en:'modern',     ja:'現代の',       cat:'adjective', rare:false, level:2},
+  {en:'improve',    ja:'改善する',     cat:'verb',      rare:false, level:2},
+  {en:'achieve',    ja:'達成する',     cat:'verb',      rare:false, level:2},
+  {en:'accept',     ja:'受け入れる',   cat:'verb',      rare:false, level:2},
+  {en:'explore',    ja:'探検する',     cat:'verb',      rare:false, level:2},
+  {en:'create',     ja:'創造する',     cat:'verb',      rare:false, level:2},
+  {en:'protect',    ja:'守る',         cat:'verb',      rare:false, level:2},
+  {en:'believe',    ja:'信じる',       cat:'verb',      rare:false, level:2},
+  {en:'decide',     ja:'決める',       cat:'verb',      rare:false, level:2},
+  {en:'forget',     ja:'忘れる',       cat:'verb',      rare:false, level:2},
+  {en:'remember',   ja:'覚えている',   cat:'verb',      rare:false, level:2},
+  {en:'increase',   ja:'増やす',       cat:'verb',      rare:false, level:2},
+  {en:'decrease',   ja:'減らす',       cat:'verb',      rare:false, level:2},
+  {en:'support',    ja:'支える',       cat:'verb',      rare:false, level:2},
+  {en:'connect',    ja:'つなぐ',       cat:'verb',      rare:false, level:2},
+  {en:'gather',     ja:'集める',       cat:'verb',      rare:false, level:2},
+  {en:'wonder',     ja:'不思議に思う', cat:'verb',      rare:false, level:2},
+  {en:'prepare',    ja:'準備する',     cat:'verb',      rare:false, level:2},
+  {en:'describe',   ja:'描写する',     cat:'verb',      rare:false, level:2},
+  {en:'knowledge',  ja:'知識',         cat:'noun',      rare:false, level:2},
+  {en:'freedom',    ja:'自由',         cat:'noun',      rare:false, level:2},
+  {en:'courage',    ja:'勇気',         cat:'noun',      rare:false, level:2},
+  {en:'promise',    ja:'約束',         cat:'noun',      rare:false, level:2},
+  {en:'success',    ja:'成功',         cat:'noun',      rare:false, level:2},
+  {en:'failure',    ja:'失敗',         cat:'noun',      rare:false, level:2},
+  {en:'silence',    ja:'静けさ',       cat:'noun',      rare:false, level:2},
+  {en:'question',   ja:'質問',         cat:'noun',      rare:false, level:2},
+  {en:'answer',     ja:'答え',         cat:'noun',      rare:false, level:2},
+  {en:'future',     ja:'未来',         cat:'noun',      rare:false, level:2},
+  {en:'history',    ja:'歴史',         cat:'noun',      rare:false, level:2},
+  {en:'culture',    ja:'文化',         cat:'noun',      rare:false, level:2},
+  {en:'energy',     ja:'エネルギー',   cat:'noun',      rare:false, level:2},
+  {en:'problem',    ja:'問題',         cat:'noun',      rare:false, level:2},
+  {en:'solution',   ja:'解決策',       cat:'noun',      rare:false, level:2},
+  {en:'danger',     ja:'危険',         cat:'noun',      rare:false, level:2},
+  {en:'nature',     ja:'自然',         cat:'noun',      rare:false, level:2},
+  {en:'society',    ja:'社会',         cat:'noun',      rare:false, level:2},
+  {en:'language',   ja:'言語',         cat:'noun',      rare:false, level:2},
+  {en:'journey',    ja:'旅',           cat:'noun',      rare:false, level:2},
+  {en:'treasure',   ja:'宝物',         cat:'noun',      rare:false, level:2},
+  {en:'memory',     ja:'記憶・思い出', cat:'noun',      rare:false, level:2},
+  {en:'mystery',    ja:'謎',           cat:'noun',      rare:false, level:2},
+  {en:'miracle',    ja:'奇跡',         cat:'noun',      rare:false, level:2},
+  {en:'challenge',  ja:'挑戦',         cat:'noun',      rare:false, level:2},
+  {en:'advantage',  ja:'有利・利点',   cat:'noun',      rare:false, level:2},
+  {en:'purpose',    ja:'目的',         cat:'noun',      rare:false, level:2},
+  {en:'respect',    ja:'尊重・敬意',   cat:'noun',      rare:false, level:2},
+  {en:'effort',     ja:'努力',         cat:'noun',      rare:false, level:2},
+  // ─────── Lv3：上級 ───────
+  {en:'ambiguous',    ja:'曖昧な',         cat:'adjective', rare:false, level:3},
+  {en:'inevitable',   ja:'避けられない',   cat:'adjective', rare:false, level:3},
+  {en:'diligent',     ja:'勤勉な',         cat:'adjective', rare:false, level:3},
+  {en:'versatile',    ja:'多才な',         cat:'adjective', rare:false, level:3},
+  {en:'substantial',  ja:'実質的な',       cat:'adjective', rare:false, level:3},
+  {en:'sustainable',  ja:'持続可能な',     cat:'adjective', rare:false, level:3},
+  {en:'consecutive',  ja:'連続した',       cat:'adjective', rare:false, level:3},
+  {en:'sophisticated',ja:'洗練された',     cat:'adjective', rare:false, level:3},
+  {en:'notorious',    ja:'悪名高い',       cat:'adjective', rare:false, level:3},
+  {en:'spontaneous',  ja:'自発的な',       cat:'adjective', rare:false, level:3},
+  {en:'anticipate',   ja:'予期する',       cat:'verb',      rare:false, level:3},
+  {en:'collaborate',  ja:'協力する',       cat:'verb',      rare:false, level:3},
+  {en:'transform',    ja:'変容させる',     cat:'verb',      rare:false, level:3},
+  {en:'advocate',     ja:'擁護する',       cat:'verb',      rare:false, level:3},
+  {en:'flourish',     ja:'繁栄する',       cat:'verb',      rare:false, level:3},
+  {en:'deteriorate',  ja:'悪化する',       cat:'verb',      rare:false, level:3},
+  {en:'implement',    ja:'実施する',       cat:'verb',      rare:false, level:3},
+  {en:'negotiate',    ja:'交渉する',       cat:'verb',      rare:false, level:3},
+  {en:'perceive',     ja:'知覚する',       cat:'verb',      rare:false, level:3},
+  {en:'accumulate',   ja:'蓄積する',       cat:'verb',      rare:false, level:3},
+  {en:'integrity',    ja:'誠実さ',         cat:'noun',      rare:false, level:3},
+  {en:'empathy',      ja:'共感',           cat:'noun',      rare:false, level:3},
+  {en:'harmony',      ja:'調和',           cat:'noun',      rare:false, level:3},
+  {en:'virtue',       ja:'美徳',           cat:'noun',      rare:false, level:3},
+  {en:'ambition',     ja:'野心',           cat:'noun',      rare:false, level:3},
+  {en:'perception',   ja:'知覚・認識',     cat:'noun',      rare:false, level:3},
+  {en:'philosophy',   ja:'哲学',           cat:'noun',      rare:false, level:3},
+  {en:'innovation',   ja:'革新',           cat:'noun',      rare:false, level:3},
+  {en:'perspective',  ja:'観点・視点',     cat:'noun',      rare:false, level:3},
+  {en:'consequence',  ja:'結果・影響',     cat:'noun',      rare:false, level:3},
+  // ─────── Lv4：レア・激難 ───────
+  {en:'persevere',    ja:'忍耐する',       cat:'verb',      rare:true,  level:4},
+  {en:'contemplate',  ja:'熟考する',       cat:'verb',      rare:true,  level:4},
+  {en:'illuminate',   ja:'照らす・解明する',cat:'verb',     rare:true,  level:4},
+  {en:'transcend',    ja:'超越する',       cat:'verb',      rare:true,  level:4},
+  {en:'manifest',     ja:'明らかにする',   cat:'verb',      rare:true,  level:4},
+  {en:'endeavor',     ja:'努力する',       cat:'verb',      rare:true,  level:4},
+  {en:'relinquish',   ja:'手放す・諦める', cat:'verb',      rare:true,  level:4},
+  {en:'perpetuate',   ja:'永続させる',     cat:'verb',      rare:true,  level:4},
+  {en:'eloquent',     ja:'雄弁な',         cat:'adjective', rare:true,  level:4},
+  {en:'ephemeral',    ja:'はかない',       cat:'adjective', rare:true,  level:4},
+  {en:'resilient',    ja:'回復力のある',   cat:'adjective', rare:true,  level:4},
+  {en:'profound',     ja:'深遠な',         cat:'adjective', rare:true,  level:4},
+  {en:'tenacious',    ja:'粘り強い',       cat:'adjective', rare:true,  level:4},
+  {en:'impeccable',   ja:'完璧な',         cat:'adjective', rare:true,  level:4},
+  {en:'elusive',      ja:'つかみどころのない',cat:'adjective',rare:true, level:4},
+  {en:'magnanimous',  ja:'寛大な',         cat:'adjective', rare:true,  level:4},
+  {en:'labyrinth',    ja:'迷宮',           cat:'noun',      rare:true,  level:4},
+  {en:'serenity',     ja:'平穏・静寂',     cat:'noun',      rare:true,  level:4},
+  {en:'eloquence',    ja:'雄弁さ',         cat:'noun',      rare:true,  level:4},
+  {en:'epiphany',     ja:'突然の気づき',   cat:'noun',      rare:true,  level:4},
+  {en:'paradox',      ja:'逆説',           cat:'noun',      rare:true,  level:4},
+  {en:'renaissance',  ja:'文芸復興・復活', cat:'noun',      rare:true,  level:4},
+  {en:'equilibrium',  ja:'均衡・平衡',     cat:'noun',      rare:true,  level:4},
+  {en:'sovereignty',  ja:'主権',           cat:'noun',      rare:true,  level:4},
+];
+
+// ===== 設定（ユーザーが変更可能）=====
+let CFG = {
+  timerSec:   10,   // 制限時間（秒）
+  choiceCnt:  4,    // 選択肢数
+  maxLives:   3,    // ライフ数
+};
+
+const NEXT_CORRECT = 280;  // 正解後→次問（ms）
+const NEXT_WRONG   = 900;  // 不正解後→次問（ms）
+const TIMER_IV     = 80;   // タイマー更新間隔
+
+// コンボ倍率テーブル
+const COMBO_TABLE = [
+  {min:1, max:2,  mult:1.0, label:'×1.0'},
+  {min:3, max:4,  mult:1.5, label:'×1.5'},
+  {min:5, max:6,  mult:2.0, label:'×2.0'},
+  {min:7, max:9,  mult:3.0, label:'×3.0'},
+  {min:10,max:99, mult:5.0, label:'×5.0'},
+];
+
+// ===== セーブデータ =====
+let SD = {
+  highScore:    0,
+  totalXP:      0,
+  playCount:    0,
+  totalCorrect: 0,
+  totalAnswers: 0,
+  totalScore:   0,
+  allTimeCombo: 0,
+  lastDate:     null,
+  streakDays:   0,
+  ranking:      [],   // {score, correct, combo, date}[]  最大20件
+  settings:     {timerSec:10, choiceCnt:4, maxLives:3},
+};
+
+function loadSD() {
+  try {
+    const s = localStorage.getItem('wm_v3');
+    if (s) SD = Object.assign(SD, JSON.parse(s));
+    CFG = Object.assign(CFG, SD.settings || {});
+  } catch(e){}
+}
+function saveSD() {
+  SD.settings = {...CFG};
+  try { localStorage.setItem('wm_v3', JSON.stringify(SD)); } catch(e){}
+}
+
+function checkStreak() {
+  const today = new Date().toDateString();
+  if (SD.lastDate === today) return;
+  const yest = new Date(Date.now()-86400000).toDateString();
+  SD.streakDays = (SD.lastDate === yest) ? (SD.streakDays||0)+1 : 1;
+  SD.lastDate   = today;
+}
+
+// スコアをランキングに追加（上位20件保持）
+function addRanking(score, correct, combo) {
+  const entry = {
+    score, correct, combo,
+    date: new Date().toLocaleDateString('ja-JP'),
+  };
+  SD.ranking.push(entry);
+  SD.ranking.sort((a,b)=>b.score-a.score);
+  if (SD.ranking.length > 20) SD.ranking.length = 20;
+}
+
+// ===== レベル計算 =====
+function getLevel(xp) {
+  let lv=1, used=0;
+  while(lv<100){ const n=100*lv; if(xp<used+n) break; used+=n; lv++; }
+  return {level:lv, levelXP:xp-used, nextXP:100*lv};
+}
+
+// ===== ユーティリティ =====
+function getMultiplier(c){ for(const t of COMBO_TABLE) if(c>=t.min&&c<=t.max) return t; return COMBO_TABLE.at(-1); }
+function shuffle(a){ const r=[...a]; for(let i=r.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[r[i],r[j]]=[r[j],r[i]];} return r; }
+
+// ===== 問題生成（正解数で難易度が上がる）=====
+// 難易度ステージ定義
+function getStage(correct) {
+  if (correct < 3)  return {lvMax:1, label:'Lv.1', cls:'diff-1'};
+  if (correct < 8)  return {lvMax:2, label:'Lv.2', cls:'diff-2'};
+  if (correct < 15) return {lvMax:3, label:'Lv.3', cls:'diff-3'};
+  return              {lvMax:4, label:'Lv.4', cls:'diff-4'};
+}
+
+function makeQuestion(correctCount, usedWords) {
+  const stage = getStage(correctCount);
+  let pool = WORDS.filter(w => w.level <= stage.lvMax);
+
+  // 15問超はLv4（レア）を重点出題
+  if (correctCount >= 15) {
+    const lv4 = WORDS.filter(w=>w.level===4);
+    pool = [...lv4,...lv4,...pool];
+  }
+
+  // 出題済み除外
+  let avail = pool.filter(w=>!usedWords.includes(w.en));
+  if (avail.length < 4) avail = [...pool];
+
+  const correct = avail[Math.floor(Math.random()*avail.length)];
+  const wrongPool = WORDS.filter(w=>w.ja!==correct.ja);
+  const wrongs = shuffle(wrongPool).slice(0, CFG.choiceCnt-1);
+
+  return {correct, choices:shuffle([correct,...wrongs]), stage};
+}
+
+// ===== ゲーム状態 =====
+let G = {};
+
+// ===== ゲーム開始 =====
+function startGame() {
+  loadSD();
+  checkStreak();
+  SD.playCount++;
+  saveSD();
+
+  G = {
+    qNum:         1,
+    score:        0,
+    lives:        CFG.maxLives,
+    combo:        0,
+    maxCombo:     0,
+    correctCount: 0,
+    answered:     false,
+    timerVal:     CFG.timerSec * 1000,
+    timerH:       null,
+    usedWords:    [],
+    currentQ:     null,
+  };
+
+  showScreen('gameScreen');
+  updateXPBar();
+  loadNextQ();
+}
+
+// ===== 問題ロード =====
+function loadNextQ() {
+  const q = makeQuestion(G.correctCount, G.usedWords);
+  G.currentQ = q;
+  G.usedWords.push(q.correct.en);
+  G.answered = false;
+
+  // フィードバッククリア
+  const fb = document.getElementById('feedback');
+  fb.textContent=''; fb.className='feedback';
+
+  // 単語カード更新
+  const wc = document.getElementById('wordCard');
+  document.getElementById('wordEn').textContent  = q.correct.en;
+  document.getElementById('wordCat').textContent = q.correct.cat;
+
+  // 難易度バッジ
+  const db = document.getElementById('diffBadge');
+  db.textContent  = q.stage.label;
+  db.className    = 'diff-badge ' + q.stage.cls;
+
+  // レアバッジ
+  const rb = document.getElementById('rareBadge');
+  if (q.correct.rare) {
+    wc.classList.add('rare'); rb.style.display='block';
+    spawnParticles(wc, 8, '#ffd700');
+  } else {
+    wc.classList.remove('rare'); rb.style.display='none';
+  }
+
+  // 選択肢ボタン生成
+  const ce = document.getElementById('choices');
+  ce.innerHTML='';
+  q.choices.forEach((w,i)=>{
+    const b = document.createElement('button');
+    b.className='cbtn'; b.textContent=w.ja;
+    b.onclick=()=>selectAnswer(i);
+    ce.appendChild(b);
+  });
+
+  updateGameUI();
+  startTimer();
+}
+
+// ===== タイマー =====
+function startTimer() {
+  clearInterval(G.timerH);
+  G.timerVal = CFG.timerSec * 1000;
+  const bar = document.getElementById('timerBar');
+
+  G.timerH = setInterval(()=>{
+    G.timerVal -= TIMER_IV;
+    const pct = Math.max(0,(G.timerVal/(CFG.timerSec*1000))*100);
+    bar.style.width = pct+'%';
+    if (G.timerVal<=3000) bar.classList.add('danger');
+    else bar.classList.remove('danger');
+    if (G.timerVal<=0){ clearInterval(G.timerH); if(!G.answered) timeOut(); }
+  }, TIMER_IV);
+}
+
+function timeOut() {
+  G.answered=true;
+  showFeedback(`⏰ TIME OUT！　正解：${G.currentQ.correct.ja}`, false);
+  markCorrect();
+  G.combo=0; G.lives--;
+  updateGameUI();
+  screenFlash('#ff2255');
+  setTimeout(proceed, NEXT_WRONG);
+}
+
+// ===== 回答選択 =====
+function selectAnswer(idx) {
+  if (G.answered) return;
+  G.answered=true;
+  clearInterval(G.timerH);
+
+  const q = G.currentQ;
+  const ok = q.choices[idx].ja === q.correct.ja;
+
+  document.querySelectorAll('.cbtn').forEach((b,i)=>{
+    b.disabled=true;
+    if (q.choices[i].ja===q.correct.ja) b.classList.add('correct');
+    else if (i===idx && !ok) b.classList.add('wrong');
+  });
+
+  if (ok) onCorrect(); else onWrong(q.correct.ja);
+}
+
+function onCorrect() {
+  G.combo++; G.correctCount++; G.qNum++;
+  if (G.combo>G.maxCombo) G.maxCombo=G.combo;
+  const m = getMultiplier(G.combo);
+  const gained = Math.floor(100 * m.mult);
+  G.score += gained;
+
+  showFeedback(`✅ +${gained}点！`, true);
+  updateGameUI();
+  spawnParticles(document.getElementById('wordCard'), 10, '#00ff88');
+  if (G.combo>=3) showCombo(G.combo, m.label);
+
+  const prevLv = getLevel(SD.totalXP).level;
+  SD.totalXP += 20 + G.combo*2;
+  saveSD(); updateXPBar();
+  if (getLevel(SD.totalXP).level>prevLv) showLevelUp();
+
+  setTimeout(proceed, NEXT_CORRECT);
+}
+
+function onWrong(ans) {
+  G.combo=0; G.lives--; G.qNum++;
+  showFeedback(`❌ 正解：${ans}`, false);
+  updateGameUI();
+  screenFlash('#ff2255');
+  setTimeout(proceed, NEXT_WRONG);
+}
+
+function proceed() {
+  if (G.lives<=0) endGame(); else loadNextQ();
+}
+
+// ===== UI更新 =====
+function updateGameUI() {
+  document.getElementById('g-score').textContent = G.score;
+  let lv='';
+  for(let i=0;i<CFG.maxLives;i++) lv += i<G.lives?'❤️':'🖤';
+  document.getElementById('g-lives').textContent = lv;
+  document.getElementById('g-combo').textContent = getMultiplier(G.combo).label;
+  document.getElementById('g-qnum').textContent  = G.qNum;
+  const st = getStage(G.correctCount);
+  document.getElementById('g-diff').textContent  = st.label;
+}
+
+function updateXPBar() {
+  const lv=getLevel(SD.totalXP);
+  document.getElementById('g-lv').textContent  = lv.level;
+  document.getElementById('g-xp').textContent  = lv.levelXP;
+  document.getElementById('g-nxp').textContent = lv.nextXP;
+  document.getElementById('xpFill').style.width = Math.min(100,(lv.levelXP/lv.nextXP)*100)+'%';
+}
+
+function showFeedback(msg, ok) {
+  const el=document.getElementById('feedback');
+  el.textContent=msg; el.className='feedback '+(ok?'fb-ok':'fb-ng');
+}
+
+function markCorrect() {
+  const q=G.currentQ;
+  document.querySelectorAll('.cbtn').forEach((b,i)=>{
+    b.disabled=true;
+    if(q.choices[i].ja===q.correct.ja) b.classList.add('correct');
+  });
+}
+
+// ===== ゲーム終了 =====
+function endGame() {
+  clearInterval(G.timerH);
+
+  // 統計更新
+  SD.totalCorrect += G.correctCount;
+  SD.totalAnswers += G.qNum - 1;
+  SD.totalScore   += G.score;
+  if (G.maxCombo > (SD.allTimeCombo||0)) SD.allTimeCombo = G.maxCombo;
+  const isNew = G.score > SD.highScore;
+  if (isNew) SD.highScore = G.score;
+  addRanking(G.score, G.correctCount, G.maxCombo);
+  saveSD();
+
+  // ランク
+  let rank, lbl;
+  const cc=G.correctCount;
+  if      (cc>=20) {rank='S';lbl='🌟 LEGEND！';}
+  else if (cc>=12) {rank='A';lbl='🎉 Excellent!';}
+  else if (cc>=6)  {rank='B';lbl='👍 Good!';}
+  else             {rank='C';lbl='😅 Keep trying!';}
+
+  const re=document.getElementById('res-rank');
+  re.textContent=rank; re.className='rank-big rank-'+rank;
+  document.getElementById('res-lbl').textContent     = lbl;
+  document.getElementById('res-score').textContent   = G.score;
+  document.getElementById('res-correct').textContent = G.correctCount+'問';
+  document.getElementById('res-combo').textContent   = G.maxCombo;
+  document.getElementById('res-newhs').style.display = isNew?'block':'none';
+
+  showScreen('resultScreen');
+  if (isNew) spawnParticles(document.body,36,'#ffd700');
+}
+
+// ===== タイトル表示 =====
+function showTitle() {
+  loadSD();
+  const lv=getLevel(SD.totalXP);
+  document.getElementById('t-hs').textContent     = SD.highScore.toLocaleString();
+  document.getElementById('t-lv').textContent     = lv.level;
+  document.getElementById('t-games').textContent  = SD.playCount;
+  document.getElementById('t-streak').textContent = (SD.streakDays||0)+'日';
+
+  const b=document.getElementById('streakBanner');
+  if ((SD.streakDays||0)>=2) {
+    b.style.display='block';
+    b.textContent=`🔥 ${SD.streakDays}日連続プレイ中！ ボーナスXP +${SD.streakDays*10}XP`;
+  } else { b.style.display='none'; }
+
+  showScreen('titleScreen');
+}
+
+// ===== ランキング画面 =====
+function buildRanking() {
+  const t = document.getElementById('rankTable');
+  if (!SD.ranking||SD.ranking.length===0) {
+    t.innerHTML='<div class="rank-empty">まだ記録がありません。<br>プレイして記録を作ろう！</div>';
+    return;
+  }
+  const medals=['🥇','🥈','🥉'];
+  const rowCls =['gold-row','silver-row','bronze-row'];
+  t.innerHTML = SD.ranking.slice(0,10).map((r,i)=>`
+    <div class="rank-row ${rowCls[i]||''}">
+      <div class="rank-pos">${medals[i]||('#'+(i+1))}</div>
+      <div class="rank-score">${r.score.toLocaleString()}点</div>
+      <div class="rank-detail">正解${r.correct}問　コンボ${r.combo}</div>
+      <div class="rank-date">${r.date}</div>
+    </div>`).join('');
+}
+
+// ===== 統計画面 =====
+function buildStats() {
+  const total = SD.totalAnswers||0;
+  const acc   = total>0 ? Math.round((SD.totalCorrect/total)*100) : 0;
+  document.getElementById('st-games').textContent   = SD.playCount||0;
+  document.getElementById('st-correct').textContent = SD.totalCorrect||0;
+  document.getElementById('st-score').textContent   = (SD.totalScore||0).toLocaleString();
+  document.getElementById('st-combo').textContent   = SD.allTimeCombo||0;
+  document.getElementById('st-xp').textContent      = SD.totalXP||0;
+  document.getElementById('st-lv').textContent      = getLevel(SD.totalXP||0).level;
+  document.getElementById('st-acc').textContent     = acc+'%';
+  document.getElementById('st-accBar').style.width  = acc+'%';
+}
+
+// ===== 設定 =====
+function setSetting(key, val) {
+  if (key==='timer')  { CFG.timerSec=val;  updateSeg('timerSeg', val); }
+  if (key==='choice') { CFG.choiceCnt=val; updateSeg('choiceSeg', val); }
+  if (key==='lives')  { CFG.maxLives=val;  updateSeg('livesSeg', val); }
+  SD.settings={...CFG}; saveSD();
+}
+function updateSeg(id, val) {
+  document.querySelectorAll(`#${id} .seg-btn`).forEach(b=>{
+    b.classList.toggle('active', +b.dataset.val===val);
+  });
+}
+function initSettings() {
+  updateSeg('timerSeg', CFG.timerSec);
+  updateSeg('choiceSeg', CFG.choiceCnt);
+  updateSeg('livesSeg', CFG.maxLives);
+}
+function resetData() {
+  if (!confirm('全データをリセットしますか？この操作は元に戻せません。')) return;
+  localStorage.removeItem('wm_v3');
+  SD={highScore:0,totalXP:0,playCount:0,totalCorrect:0,totalAnswers:0,
+      totalScore:0,allTimeCombo:0,lastDate:null,streakDays:0,ranking:[],
+      settings:{timerSec:10,choiceCnt:4,maxLives:3}};
+  CFG={timerSec:10,choiceCnt:4,maxLives:3};
+  initSettings(); showTitle();
+}
+
+// ===== 画面切り替え =====
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  if (id==='rankingScreen') { loadSD(); buildRanking(); }
+  if (id==='statsScreen')   { loadSD(); buildStats(); }
+  if (id==='settingsScreen'){ initSettings(); }
+}
+
+// ===== 演出 =====
+function showCombo(n, label) {
+  const el=document.getElementById('comboOverlay');
+  el.innerHTML=`<div class="combo-text">${n} COMBO！<br><small style="font-size:.42em">${label}</small></div>`;
+  setTimeout(()=>{el.innerHTML='';}, 750);
+}
+function showLevelUp() {
+  const p=document.getElementById('lvupEl');
+  p.style.display='block';
+  spawnParticles(document.body,22,'#bf5fff');
+  setTimeout(()=>{p.style.display='none';},1100);
+}
+function screenFlash(c) {
+  const d=document.createElement('div');
+  d.style.cssText=`position:fixed;inset:0;z-index:999;background:${c};opacity:.15;
+    pointer-events:none;animation:_fl .28s ease forwards`;
+  const s=document.createElement('style');
+  s.textContent='@keyframes _fl{from{opacity:.15}to{opacity:0}}';
+  document.head.appendChild(s); document.body.appendChild(d);
+  setTimeout(()=>{d.remove();s.remove();},300);
+}
+function spawnParticles(target, n, color) {
+  const c=document.getElementById('pcont');
+  const box=(target===document.body)
+    ?{left:innerWidth/2,top:innerHeight/2,width:0,height:0}
+    :target.getBoundingClientRect();
+  const cx=box.left+box.width/2, cy=box.top+box.height/2;
+  for(let i=0;i<n;i++){
+    const p=document.createElement('div');
+    p.className='particle';
+    const sz=4+Math.random()*5, ang=Math.random()*360, dist=70+Math.random()*140;
+    const tx=Math.cos(ang*Math.PI/180)*dist+'px', ty=Math.sin(ang*Math.PI/180)*dist+'px';
+    const dur=.35+Math.random()*.4;
+    p.style.cssText=`width:${sz}px;height:${sz}px;background:${color};
+      box-shadow:0 0 ${sz*2}px ${color};left:${cx}px;top:${cy}px;
+      --tx:translate(${tx},${ty});animation-duration:${dur}s`;
+    c.appendChild(p);
+    setTimeout(()=>p.remove(),dur*1000+100);
+  }
+}
+
+// ===== 星生成 =====
+function createStars() {
+  const c=document.getElementById('stars');
+  for(let i=0;i<70;i++){
+    const s=document.createElement('div'); s.className='star';
+    const sz=1+Math.random()*2.2;
+    s.style.cssText=`width:${sz}px;height:${sz}px;left:${Math.random()*100}%;
+      top:${Math.random()*100}%;animation-duration:${2+Math.random()*4}s;
+      animation-delay:${Math.random()*4}s`;
+    c.appendChild(s);
+  }
+}
+
+// ===== 初期化 =====
+(function(){
+  createStars();
+  loadSD();
+  showTitle();
+})();
+</script>
+</body>
+</html>
